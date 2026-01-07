@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useCallback,
 } from 'react';
 import EnrichedTextInputNativeComponent, {
   Commands,
@@ -170,10 +171,62 @@ const warnAboutMissconfiguredMentions = (indicator: string) => {
 
 type ComponentType = (Component<NativeProps, {}, any> & NativeMethods) | null;
 
-type HtmlRequest = {
-  resolve: (html: string) => void;
+type PendingRequest<Success> = {
+  resolve: (value: Success) => void;
   reject: (error: Error) => void;
 };
+
+/** Manages asynchronous requests to native component */
+function useRequests<Success, Result>(opts: {
+  performRequest: (requestId: number) => void;
+  extractRequestId: (result: Result) => number;
+  resolveUsingResult: (
+    e: Result,
+    callbacks: {
+      resolve: (value: Success) => void;
+      reject: (reason: Error) => void;
+    }
+  ) => void;
+}) {
+  const nextRequestId = useRef(1);
+  const pendingRequests = useRef(new Map<number, PendingRequest<Success>>());
+
+  // We never want to trigger a render based on changes to params - wrap
+  // everything in a ref and use useCallback to get stable functions.
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
+
+  useEffect(() => {
+    const pending = pendingRequests.current;
+    return () => {
+      pending.forEach(({ reject }) => {
+        reject(new Error('Component unmounted'));
+      });
+      pending.clear();
+    };
+  }, []);
+
+  const request = useCallback(() => {
+    return new Promise<Success>((resolve, reject) => {
+      const requestId = nextRequestId.current++;
+      pendingRequests.current.set(requestId, { resolve, reject });
+      optsRef.current.performRequest(requestId);
+    });
+  }, [optsRef]);
+
+  const onResult = useCallback(
+    (e: Result) => {
+      const requestId = optsRef.current.extractRequestId(e);
+      const pending = pendingRequests.current.get(requestId);
+      if (!pending) return;
+      optsRef.current.resolveUsingResult(e, pending);
+      pendingRequests.current.delete(requestId);
+    },
+    [optsRef]
+  );
+
+  return { request, onResult };
+}
 
 export const EnrichedTextInput = ({
   ref,
@@ -205,18 +258,25 @@ export const EnrichedTextInput = ({
 }: EnrichedTextInputProps) => {
   const nativeRef = useRef<ComponentType | null>(null);
 
-  const nextHtmlRequestId = useRef(1);
-  const pendingHtmlRequests = useRef(new Map<number, HtmlRequest>());
-
-  useEffect(() => {
-    const pendingRequests = pendingHtmlRequests.current;
-    return () => {
-      pendingRequests.forEach(({ reject }) => {
-        reject(new Error('Component unmounted'));
-      });
-      pendingRequests.clear();
-    };
-  }, []);
+  const htmlRequests = useRequests<
+    string,
+    NativeSyntheticEvent<OnRequestHtmlResultEvent>
+  >({
+    performRequest: (requestId) => {
+      Commands.requestAttributedString(
+        nullthrows(nativeRef.current),
+        requestId
+      );
+    },
+    extractRequestId: (e) => e.nativeEvent.requestId,
+    resolveUsingResult: ({ nativeEvent: { html } }, { resolve, reject }) => {
+      if (html === null || typeof html !== 'string') {
+        reject(new Error('Failed to parse HTML'));
+      } else {
+        resolve(html);
+      }
+    },
+  });
 
   const normalizedHtmlStyle = useMemo(
     () => normalizeHtmlStyle(htmlStyle, mentionIndicators),
@@ -253,13 +313,7 @@ export const EnrichedTextInput = ({
     setValue: (value: string) => {
       Commands.setValue(nullthrows(nativeRef.current), value);
     },
-    getHTML: () => {
-      return new Promise<string>((resolve, reject) => {
-        const requestId = nextHtmlRequestId.current++;
-        pendingHtmlRequests.current.set(requestId, { resolve, reject });
-        Commands.requestHTML(nullthrows(nativeRef.current), requestId);
-      });
-    },
+    getHTML: htmlRequests.request,
     toggleBold: () => {
       Commands.toggleBold(nullthrows(nativeRef.current));
     },
@@ -366,22 +420,6 @@ export const EnrichedTextInput = ({
     onMentionDetected?.({ text, indicator, attributes });
   };
 
-  const handleRequestHtmlResult = (
-    e: NativeSyntheticEvent<OnRequestHtmlResultEvent>
-  ) => {
-    const { requestId, html } = e.nativeEvent;
-    const pending = pendingHtmlRequests.current.get(requestId);
-    if (!pending) return;
-
-    if (html === null || typeof html !== 'string') {
-      pending.reject(new Error('Failed to parse HTML'));
-    } else {
-      pending.resolve(html);
-    }
-
-    pendingHtmlRequests.current.delete(requestId);
-  };
-
   return (
     <EnrichedTextInputNativeComponent
       ref={nativeRef}
@@ -407,7 +445,7 @@ export const EnrichedTextInput = ({
       onMentionDetected={handleMentionDetected}
       onMention={handleMentionEvent}
       onChangeSelection={onChangeSelection}
-      onRequestHtmlResult={handleRequestHtmlResult}
+      onRequestHtmlResult={htmlRequests.onResult}
       androidExperimentalSynchronousEvents={
         androidExperimentalSynchronousEvents
       }
