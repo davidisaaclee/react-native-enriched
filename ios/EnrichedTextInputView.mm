@@ -1072,6 +1072,9 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   } else if ([commandName isEqualToString:@"requestHTML"]) {
     NSInteger requestId = [((NSNumber *)args[0]) integerValue];
     [self requestHTML:requestId];
+  } else if ([commandName isEqualToString:@"requestAttributedString"]) {
+    NSInteger requestId = [((NSNumber *)args[0]) integerValue];
+    [self requestAttributedString:requestId];
   }
 }
 
@@ -1215,6 +1218,88 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
     } @catch (NSException *exception) {
       emitter->onRequestHtmlResult({.requestId = static_cast<int>(requestId),
                                     .html = folly::dynamic(nullptr)});
+    }
+  }
+}
+
+- (EnrichedTextInputViewEventEmitter::
+       OnRequestAttributedStringResultAttributedString)
+    buildAttributedStringRunFrom:
+        (NSDictionary<NSAttributedStringKey, id> *_Nonnull)attrs
+                            text:(NSString *)text {
+  // Create attributed string entry
+  auto entry = EnrichedTextInputViewEventEmitter::
+      OnRequestAttributedStringResultAttributedString{};
+  entry.text = [text toCppString];
+
+  // Process font attribute
+  if (attrs[NSFontAttributeName]) {
+    UIFont *font = attrs[NSFontAttributeName];
+
+    UIFontDescriptor *descriptor = font.fontDescriptor;
+    UIFontDescriptorSymbolicTraits symbolicTraits = descriptor.symbolicTraits;
+
+    std::vector<std::string> traits;
+    if (symbolicTraits & UIFontDescriptorTraitBold) {
+      traits.push_back("bold");
+    }
+    if (symbolicTraits & UIFontDescriptorTraitItalic) {
+      traits.push_back("italic");
+    }
+
+    auto fontAttr = EnrichedTextInputViewEventEmitter::
+        OnRequestAttributedStringResultAttributedStringAttributes{};
+    fontAttr.type = "font";
+    fontAttr.font = {.pointSize = font.pointSize, .traits = traits};
+    entry.attributes.push_back(fontAttr);
+  }
+
+  // Process underline style attribute
+  if (attrs[NSUnderlineStyleAttributeName]) {
+    NSNumber *underlineStyle = attrs[NSUnderlineStyleAttributeName];
+    auto underlineAttr = EnrichedTextInputViewEventEmitter::
+        OnRequestAttributedStringResultAttributedStringAttributes{};
+    underlineAttr.type = "underlineStyle";
+    underlineAttr.underlineStyle = [underlineStyle doubleValue];
+    entry.attributes.push_back(underlineAttr);
+  }
+
+  return entry;
+}
+
+- (EnrichedTextInputViewEventEmitter::OnRequestAttributedStringResult)
+             convert:(NSAttributedString *)str
+    forRequestWithId:(int)requestId {
+  __block auto converted =
+      EnrichedTextInputViewEventEmitter::OnRequestAttributedStringResult{};
+  converted.requestId = requestId;
+  [str enumerateAttributesInRange:NSMakeRange(0, [str length])
+                          options:0
+                       usingBlock:^(NSDictionary<NSAttributedStringKey, id>
+                                        *_Nonnull attrs,
+                                    NSRange range, BOOL *_Nonnull stop) {
+                         // Extract text for this range
+                         NSString *text =
+                             [[str string] substringWithRange:range];
+
+                         // Create attributed string entry
+                         auto entry = [self buildAttributedStringRunFrom:attrs
+                                                                    text:text];
+                         converted.attributedString.push_back(entry);
+                       }];
+  return converted;
+}
+
+- (void)requestAttributedString:(NSInteger)requestId {
+  auto emitter = [self getEventEmitter];
+  if (emitter != nullptr) {
+    @try {
+      auto event = [self convert:textView.textStorage
+                forRequestWithId:static_cast<int>(requestId)];
+      emitter->onRequestAttributedStringResult(event);
+    } @catch (NSException *exception) {
+      // TODO
+      RCTFatal(nil);
     }
   }
 }

@@ -20,6 +20,7 @@ import EnrichedTextInputNativeComponent, {
   type OnMentionDetectedInternal,
   type OnRequestHtmlResultEvent,
   type MentionStyleProperties,
+  type OnRequestAttributedStringResultEvent,
 } from './EnrichedTextInputNativeComponent';
 import type {
   ColorValue,
@@ -35,12 +36,63 @@ import type {
 } from 'react-native';
 import { normalizeHtmlStyle } from './normalizeHtmlStyle';
 
+type NativeAttributedStringRun =
+  OnRequestAttributedStringResultEvent['attributedString'][number];
+interface AttributedStringRun {
+  text: string;
+  attributes: Array<
+    | {
+        type: 'font';
+        font: {
+          pointSize: number;
+          traits: string[];
+        };
+      }
+    | {
+        type: 'underlineStyle';
+        /** see NSUnderlineStyle */
+        underlineStyle?: number;
+      }
+  >;
+}
+
+function castAttributedStringRun(
+  native: NativeAttributedStringRun
+): AttributedStringRun {
+  const expectedAttributeTypes = [
+    'font',
+    'underlineStyle',
+  ] as const satisfies (keyof NativeAttributedStringRun['attributes'][number])[];
+  return {
+    text: native.text,
+    attributes: native.attributes.map((attr) => {
+      const type =
+        attr.type as AttributedStringRun['attributes'][number]['type'];
+      if (!expectedAttributeTypes.includes(type)) {
+        throw new Error(
+          `Malformed AttributedStringRun: unexpected attribute type "${attr.type}"`
+        );
+      }
+      if (attr[type] === undefined) {
+        throw new Error(
+          `Malformed AttributedStringRun: missing attribute data for type "${attr.type}"`
+        );
+      }
+      return {
+        type,
+        [type]: attr[type]!,
+      } as unknown as AttributedStringRun['attributes'][number];
+    }),
+  };
+}
+
 export interface EnrichedTextInputInstance extends NativeMethods {
   // General commands
   focus: () => void;
   blur: () => void;
   setValue: (value: string) => void;
   setSelection: (start: number, end: number) => void;
+  getAttributedString: () => Promise<AttributedStringRun[]>;
   getHTML: () => Promise<string>;
 
   // Text formatting commands
@@ -277,6 +329,24 @@ export const EnrichedTextInput = ({
       }
     },
   });
+  const attributedStringRequests = useRequests<
+    AttributedStringRun[],
+    NativeSyntheticEvent<OnRequestAttributedStringResultEvent>
+  >({
+    performRequest: (requestId) => {
+      Commands.requestAttributedString(
+        nullthrows(nativeRef.current),
+        requestId
+      );
+    },
+    extractRequestId: (e) => e.nativeEvent.requestId,
+    resolveUsingResult: (
+      { nativeEvent: { attributedString } },
+      { resolve }
+    ) => {
+      resolve(attributedString.map(castAttributedStringRun));
+    },
+  });
 
   const normalizedHtmlStyle = useMemo(
     () => normalizeHtmlStyle(htmlStyle, mentionIndicators),
@@ -313,6 +383,7 @@ export const EnrichedTextInput = ({
     setValue: (value: string) => {
       Commands.setValue(nullthrows(nativeRef.current), value);
     },
+    getAttributedString: attributedStringRequests.request,
     getHTML: htmlRequests.request,
     toggleBold: () => {
       Commands.toggleBold(nullthrows(nativeRef.current));
@@ -445,6 +516,7 @@ export const EnrichedTextInput = ({
       onMentionDetected={handleMentionDetected}
       onMention={handleMentionEvent}
       onChangeSelection={onChangeSelection}
+      onRequestAttributedStringResult={attributedStringRequests.onResult}
       onRequestHtmlResult={htmlRequests.onResult}
       androidExperimentalSynchronousEvents={
         androidExperimentalSynchronousEvents

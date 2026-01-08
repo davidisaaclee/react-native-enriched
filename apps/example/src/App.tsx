@@ -327,6 +327,20 @@ export default function App() {
         <View style={styles.buttonStack}>
           <Button title="Focus" onPress={handleFocus} style={styles.button} />
           <Button title="Blur" onPress={handleBlur} style={styles.button} />
+          <Button
+            title="Print attributed string"
+            onPress={() => {
+              ref.current
+                ?.getAttributedString()
+                .then((attrStr) => {
+                  console.log('Attributed string:', attrStr);
+                })
+                .catch((error) => {
+                  console.error('Error getting attributed string:', error);
+                });
+            }}
+            style={styles.button}
+          />
         </View>
         <Button
           title="Set input's value"

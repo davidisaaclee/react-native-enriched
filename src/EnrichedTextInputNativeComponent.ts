@@ -67,6 +67,29 @@ export interface OnChangeSelectionEvent {
   text: string;
 }
 
+export type AttributedStringRun =
+  OnRequestAttributedStringResultEvent['attributedString'][number];
+
+export interface OnRequestAttributedStringResultEvent {
+  requestId: Int32;
+  attributedString: {
+    text: string;
+    attributes: {
+      // `type` is one of the other keys in this object - e.g. `font`, in which
+      // case `attributes.font` will be defined
+      type: string;
+
+      font?: {
+        pointSize: Float;
+        traits: string[]; // 'bold' | 'italic'
+      };
+
+      /** see NSUnderlineStyle */
+      underlineStyle?: Float;
+    }[];
+  }[];
+}
+
 export interface OnRequestHtmlResultEvent {
   requestId: Int32;
   html: UnsafeMixed;
@@ -151,6 +174,7 @@ export interface NativeProps extends ViewProps {
   onMention?: DirectEventHandler<OnMentionEvent>;
   onChangeSelection?: DirectEventHandler<OnChangeSelectionEvent>;
   onRequestHtmlResult?: DirectEventHandler<OnRequestHtmlResultEvent>;
+  onRequestAttributedStringResult?: DirectEventHandler<OnRequestAttributedStringResultEvent>;
 
   // Style related props - used for generating proper setters in component's manager
   // These should not be passed as regular props
@@ -225,6 +249,10 @@ interface NativeCommands {
     viewRef: React.ElementRef<ComponentType>,
     requestId: Int32
   ) => void;
+  requestAttributedString: (
+    viewRef: React.ElementRef<ComponentType>,
+    requestId: Int32
+  ) => void;
 }
 
 export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
@@ -256,6 +284,7 @@ export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
     'startMention',
     'addMention',
     'requestHTML',
+    'requestAttributedString',
   ],
 });
 
