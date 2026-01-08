@@ -186,6 +186,7 @@ export interface EnrichedTextInputProps extends Omit<ViewProps, 'children'> {
   htmlStyle?: HtmlStyle;
   style?: ViewStyle | TextStyle;
   scrollEnabled?: boolean;
+  allowsEditingTextAttributes?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
   onChangeText?: (e: NativeSyntheticEvent<OnChangeTextEvent>) => void;
