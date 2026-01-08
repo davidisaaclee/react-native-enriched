@@ -9,6 +9,7 @@ import {
   type OnChangeStateEvent,
   type OnChangeSelectionEvent,
   type HtmlStyle,
+  type AttributedStringRun,
 } from 'react-native-enriched';
 import { useRef, useState } from 'react';
 import { Button } from './components/Button';
@@ -284,6 +285,10 @@ export default function App() {
     setSelection(sel);
   };
 
+  const [attrString, setAttrString] = useState<AttributedStringRun[] | null>(
+    null
+  );
+
   return (
     <>
       <ScrollView
@@ -327,17 +332,34 @@ export default function App() {
         <View style={styles.buttonStack}>
           <Button title="Focus" onPress={handleFocus} style={styles.button} />
           <Button title="Blur" onPress={handleBlur} style={styles.button} />
+        </View>
+        <View style={styles.buttonStack}>
           <Button
-            title="Print attributed string"
-            onPress={() => {
+            title="Read attr. string"
+            onPress={async () => {
               ref.current
                 ?.getAttributedString()
                 .then((attrStr) => {
                   console.log('Attributed string:', attrStr);
+                  setAttrString(attrStr);
                 })
                 .catch((error) => {
                   console.error('Error getting attributed string:', error);
                 });
+            }}
+            style={styles.button}
+          />
+          <Button
+            title="Write attr. string"
+            disabled={!attrString}
+            onPress={async () => {
+              const textInput = ref.current;
+              if (!textInput) {
+                return;
+              }
+              if (attrString) {
+                textInput.setAttributedString(attrString);
+              }
             }}
             style={styles.button}
           />

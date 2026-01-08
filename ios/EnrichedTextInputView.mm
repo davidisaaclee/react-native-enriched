@@ -1015,6 +1015,8 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   } else if ([commandName isEqualToString:@"setValue"]) {
     NSString *value = (NSString *)args[0];
     [self setValue:value];
+  } else if ([commandName isEqualToString:@"setAttributedString"]) {
+    [self setAttributedString:(NSArray *)args[0]];
   } else if ([commandName isEqualToString:@"toggleBold"]) {
     [self toggleRegularStyle:[BoldStyle getStyleType]];
   } else if ([commandName isEqualToString:@"toggleItalic"]) {
@@ -1107,6 +1109,72 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   }
 
   // set recentlyChangedRange and check for changes
+  recentlyChangedRange = NSMakeRange(0, textView.textStorage.string.length);
+  textView.selectedRange = NSRange(textView.textStorage.string.length, 0);
+  [self anyTextMayHaveBeenModified];
+}
+
+- (void)setAttributedString:(NSArray *)attrString {
+  auto *converted = [[NSMutableAttributedString alloc] init];
+
+  for (NSDictionary *run in attrString) {
+    NSString *text = run[@"text"];
+    NSArray *attributes = run[@"attributes"];
+
+    // Build the attributes dictionary, starting with defaults
+    NSMutableDictionary<NSAttributedStringKey, id> *attrs =
+        [[NSMutableDictionary alloc] init];
+    attrs[NSForegroundColorAttributeName] = [config primaryColor];
+    attrs[NSFontAttributeName] = [config primaryFont];
+
+    // Process each attribute in the run
+    for (NSDictionary *attr in attributes) {
+      NSString *type = attr[@"type"];
+
+      if ([type isEqualToString:@"font"]) {
+        NSDictionary *fontInfo = attr[@"font"];
+        NSNumber *pointSize = fontInfo[@"pointSize"];
+        NSArray *traits = fontInfo[@"traits"];
+
+        // Build font descriptor with symbolic traits
+        UIFontDescriptorSymbolicTraits symbolicTraits = 0;
+        for (NSString *trait in traits) {
+          if ([trait isEqualToString:@"bold"]) {
+            symbolicTraits |= UIFontDescriptorTraitBold;
+          } else if ([trait isEqualToString:@"italic"]) {
+            symbolicTraits |= UIFontDescriptorTraitItalic;
+          }
+        }
+
+        // Create font with the specified size and traits
+        UIFont *baseFont = [UIFont systemFontOfSize:[pointSize doubleValue]];
+        if (symbolicTraits != 0) {
+          UIFontDescriptor *descriptor = [baseFont.fontDescriptor
+              fontDescriptorWithSymbolicTraits:symbolicTraits];
+          if (descriptor != nullptr) {
+            UIFont *font = [UIFont fontWithDescriptor:descriptor
+                                                 size:[pointSize doubleValue]];
+            attrs[NSFontAttributeName] = font;
+          }
+        } else {
+          attrs[NSFontAttributeName] = baseFont;
+        }
+      } else if ([type isEqualToString:@"underlineStyle"]) {
+        NSNumber *underlineStyle = attr[@"underlineStyle"];
+        attrs[NSUnderlineStyleAttributeName] = underlineStyle;
+      }
+    }
+
+    // Create attributed string for this run and append
+    NSAttributedString *attrStr =
+        [[NSAttributedString alloc] initWithString:text attributes:attrs];
+    [converted appendAttributedString:attrStr];
+  }
+
+  // Replace the text view's content with the new attributed string
+  [textView.textStorage setAttributedString:converted];
+
+  // Update state and notify of changes
   recentlyChangedRange = NSMakeRange(0, textView.textStorage.string.length);
   textView.selectedRange = NSRange(textView.textStorage.string.length, 0);
   [self anyTextMayHaveBeenModified];

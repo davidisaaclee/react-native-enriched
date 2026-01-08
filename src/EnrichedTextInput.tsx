@@ -38,7 +38,7 @@ import { normalizeHtmlStyle } from './normalizeHtmlStyle';
 
 type NativeAttributedStringRun =
   OnRequestAttributedStringResultEvent['attributedString'][number];
-interface AttributedStringRun {
+export interface AttributedStringRun {
   text: string;
   attributes: Array<
     | {
@@ -91,6 +91,7 @@ export interface EnrichedTextInputInstance extends NativeMethods {
   focus: () => void;
   blur: () => void;
   setValue: (value: string) => void;
+  setAttributedString: (attributedString: AttributedStringRun[]) => void;
   setSelection: (start: number, end: number) => void;
   getAttributedString: () => Promise<AttributedStringRun[]>;
   getHTML: () => Promise<string>;
@@ -382,6 +383,12 @@ export const EnrichedTextInput = ({
     },
     setValue: (value: string) => {
       Commands.setValue(nullthrows(nativeRef.current), value);
+    },
+    setAttributedString: (attributedString: AttributedStringRun[]) => {
+      Commands.setAttributedString(
+        nullthrows(nativeRef.current),
+        attributedString
+      );
     },
     getAttributedString: attributedStringRequests.request,
     getHTML: htmlRequests.request,
