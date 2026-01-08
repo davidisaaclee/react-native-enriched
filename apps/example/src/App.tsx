@@ -289,6 +289,25 @@ export default function App() {
     null
   );
 
+  const iosFonts = [
+    'Helvetica',
+    'Helvetica-Bold',
+    'Arial-BoldMT',
+    'Courier',
+    'Georgia',
+    'TimesNewRomanPSMT',
+    'Palatino-Roman',
+    'Verdana',
+    'AmericanTypewriter',
+    'Avenir-Roman',
+    'Menlo-Regular',
+  ];
+
+  const handleSetRandomFont = () => {
+    const randomFont = iosFonts[Math.floor(Math.random() * iosFonts.length)];
+    if (randomFont) ref.current?.setFont(randomFont);
+  };
+
   return (
     <>
       <ScrollView
@@ -364,6 +383,11 @@ export default function App() {
             style={styles.button}
           />
         </View>
+        <Button
+          title="Set random font"
+          onPress={handleSetRandomFont}
+          style={styles.valueButton}
+        />
         <Button
           title="Set input's value"
           onPress={openValueModal}
