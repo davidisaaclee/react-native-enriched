@@ -1087,6 +1087,9 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   } else if ([commandName isEqualToString:@"setFont"]) {
     NSString *fontName = (NSString *)args[0];
     [self setFont:fontName];
+  } else if ([commandName isEqualToString:@"setFontFamily"]) {
+    NSString *familyName = (NSString *)args[0];
+    [self setFontFamily:familyName];
   }
 }
 
@@ -1144,6 +1147,7 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
       if ([type isEqualToString:@"font"]) {
         NSDictionary *fontInfo = attr[@"font"];
         NSString *fontName = fontInfo[@"fontName"];
+        NSString *fontFamilyName = fontInfo[@"familyName"];
         NSNumber *pointSize = fontInfo[@"pointSize"];
         NSArray *traits = fontInfo[@"traits"];
 
@@ -1154,9 +1158,8 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
           font = [UIFont fontWithName:fontName size:[pointSize doubleValue]];
         }
 
-        // Fallback: create font with traits if fontName didn't work
         if (font == nullptr) {
-          // Build font descriptor with symbolic traits
+          // Fallback: create font with traits if fontName didn't work
           UIFontDescriptorSymbolicTraits symbolicTraits = 0;
           for (NSString *trait in traits) {
             if ([trait isEqualToString:@"bold"]) {
@@ -1165,19 +1168,12 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
               symbolicTraits |= UIFontDescriptorTraitItalic;
             }
           }
-
-          // Create font with the specified size and traits
-          UIFont *baseFont = [UIFont systemFontOfSize:[pointSize doubleValue]];
-          if (symbolicTraits != 0) {
-            UIFontDescriptor *descriptor = [baseFont.fontDescriptor
-                fontDescriptorWithSymbolicTraits:symbolicTraits];
-            if (descriptor != nullptr) {
-              font = [UIFont fontWithDescriptor:descriptor
-                                           size:[pointSize doubleValue]];
-            }
-          } else {
-            font = baseFont;
+          auto desc = [[UIFontDescriptor alloc] init];
+          if (fontFamilyName != nullptr && fontFamilyName.length > 0) {
+            desc = [desc fontDescriptorWithFamily:fontFamilyName];
           }
+          desc = [desc fontDescriptorWithSymbolicTraits:symbolicTraits];
+          font = [UIFont fontWithDescriptor:desc size:[pointSize doubleValue]];
         }
 
         if (font != nullptr) {
@@ -1204,6 +1200,57 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   [self anyTextMayHaveBeenModified];
 }
 
+- (void)setFontFamily:(NSString *)familyName {
+  NSRange range = textView.selectedRange;
+
+  if (range.length >= 1) {
+    // Apply font to selection range
+    [textView.textStorage beginEditing];
+    [textView.textStorage
+        enumerateAttribute:NSFontAttributeName
+                   inRange:range
+                   options:0
+                usingBlock:^(id _Nullable value, NSRange fontRange,
+                             BOOL *_Nonnull stop) {
+                  UIFont *currentFont = (UIFont *)value;
+                  if (currentFont != nullptr) {
+                    // Create new font with same size but different name
+                    CGFloat fontSize = currentFont.pointSize;
+                    UIFontDescriptor *desc = [currentFont fontDescriptor];
+                    [desc fontDescriptorWithFamily:familyName];
+                    UIFont *newFont = [UIFont fontWithDescriptor:desc
+                                                            size:fontSize];
+
+                    if (newFont != nullptr) {
+                      [textView.textStorage addAttribute:NSFontAttributeName
+                                                   value:newFont
+                                                   range:fontRange];
+                    }
+                  }
+                }];
+    [textView.textStorage endEditing];
+  } else {
+    // Apply font to typing attributes
+    UIFont *currentFont =
+        (UIFont *)textView.typingAttributes[NSFontAttributeName];
+    if (currentFont != nullptr) {
+      CGFloat fontSize = currentFont.pointSize;
+      UIFontDescriptor *desc = [currentFont fontDescriptor];
+      [desc fontDescriptorWithFamily:familyName];
+      UIFont *newFont = [UIFont fontWithDescriptor:desc size:fontSize];
+
+      if (newFont != nullptr) {
+        NSMutableDictionary *newTypingAttrs =
+            [textView.typingAttributes mutableCopy];
+        newTypingAttrs[NSFontAttributeName] = newFont;
+        textView.typingAttributes = newTypingAttrs;
+      }
+    }
+  }
+
+  [self anyTextMayHaveBeenModified];
+}
+
 - (void)setFont:(NSString *)fontName {
   NSRange range = textView.selectedRange;
 
@@ -1220,17 +1267,16 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
                   if (currentFont != nullptr) {
                     // Create new font with same size but different name
                     CGFloat fontSize = currentFont.pointSize;
-                    UIFont *newFont = [UIFont fontWithName:fontName
-                                                      size:fontSize];
+                    UIFontDescriptor *desc = [currentFont fontDescriptor];
+                    [desc fontDescriptorWithFace:fontName];
+                    UIFont *newFont = [UIFont fontWithDescriptor:desc
+                                                            size:fontSize];
 
-                    // Fallback to current font if fontName is invalid
-                    if (newFont == nullptr) {
-                      newFont = currentFont;
+                    if (newFont != nullptr) {
+                      [textView.textStorage addAttribute:NSFontAttributeName
+                                                   value:newFont
+                                                   range:fontRange];
                     }
-
-                    [textView.textStorage addAttribute:NSFontAttributeName
-                                                 value:newFont
-                                                 range:fontRange];
                   }
                 }];
     [textView.textStorage endEditing];
@@ -1240,9 +1286,10 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
         (UIFont *)textView.typingAttributes[NSFontAttributeName];
     if (currentFont != nullptr) {
       CGFloat fontSize = currentFont.pointSize;
-      UIFont *newFont = [UIFont fontWithName:fontName size:fontSize];
+      UIFontDescriptor *desc = [currentFont fontDescriptor];
+      [desc fontDescriptorWithFace:fontName];
+      UIFont *newFont = [UIFont fontWithDescriptor:desc size:fontSize];
 
-      // Fallback to current font if fontName is invalid
       if (newFont != nullptr) {
         NSMutableDictionary *newTypingAttrs =
             [textView.typingAttributes mutableCopy];
@@ -1393,7 +1440,8 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
     auto fontAttr = EnrichedTextInputViewEventEmitter::
         OnRequestAttributedStringResultAttributedStringAttributes{};
     fontAttr.type = "font";
-    fontAttr.font = {.fontName = [font.fontName toCppString],
+    fontAttr.font = {.familyName = [font.familyName toCppString],
+                     .fontName = [font.fontName toCppString],
                      .pointSize = font.pointSize,
                      .traits = traits};
     entry.attributes.push_back(fontAttr);
