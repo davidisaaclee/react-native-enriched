@@ -1,6 +1,6 @@
 import {
   type Component,
-  type RefObject,
+  type Ref,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -121,7 +121,7 @@ export interface HtmlStyle {
 }
 
 export interface EnrichedTextInputProps extends Omit<ViewProps, 'children'> {
-  ref?: RefObject<EnrichedTextInputInstance | null>;
+  ref?: Ref<EnrichedTextInputInstance | null>;
   autoFocus?: boolean;
   editable?: boolean;
   mentionIndicators?: string[];
