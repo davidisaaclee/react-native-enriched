@@ -81,6 +81,7 @@ export interface OnRequestAttributedStringResultEvent {
 
       font?: {
         fontName?: string;
+        familyName?: string;
         pointSize: Float;
         traits: string[]; // 'bold' | 'italic'
       };
@@ -228,6 +229,10 @@ interface NativeCommands {
   toggleOrderedList: (viewRef: React.ElementRef<ComponentType>) => void;
   toggleUnorderedList: (viewRef: React.ElementRef<ComponentType>) => void;
   setFont: (viewRef: React.ElementRef<ComponentType>, fontName: string) => void;
+  setFontFamily: (
+    viewRef: React.ElementRef<ComponentType>,
+    familyName: string
+  ) => void;
   addLink: (
     viewRef: React.ElementRef<ComponentType>,
     start: Int32,
@@ -287,6 +292,7 @@ export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
     'toggleOrderedList',
     'toggleUnorderedList',
     'setFont',
+    'setFontFamily',
     'addLink',
     'addImage',
     'startMention',
