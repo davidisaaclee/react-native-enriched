@@ -284,6 +284,9 @@ export default function App() {
     setSelection(sel);
   };
 
+  const [allowsEditingTextAttributes, setAllowsEditingTextAttributes] =
+    useState<boolean | undefined>(undefined);
+
   return (
     <>
       <ScrollView
@@ -316,6 +319,7 @@ export default function App() {
             androidExperimentalSynchronousEvents={
               ANDROID_EXPERIMENTAL_SYNCHRONOUS_EVENTS
             }
+            allowsEditingTextAttributes={allowsEditingTextAttributes}
           />
           <Toolbar
             stylesState={stylesState}
@@ -327,6 +331,15 @@ export default function App() {
         <View style={styles.buttonStack}>
           <Button title="Focus" onPress={handleFocus} style={styles.button} />
           <Button title="Blur" onPress={handleBlur} style={styles.button} />
+        </View>
+        <View style={styles.buttonStack}>
+          <Button
+            title={`${allowsEditingTextAttributes ? 'Disable' : 'Enable'} editing attributes`}
+            onPress={() => {
+              setAllowsEditingTextAttributes((x) => !x);
+            }}
+            style={styles.button}
+          />
         </View>
         <Button
           title="Set input's value"

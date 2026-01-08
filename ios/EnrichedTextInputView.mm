@@ -654,6 +654,13 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
     textView.editable = newViewProps.editable;
   }
 
+  // allowsEditingTextAttributes
+  if (newViewProps.allowsEditingTextAttributes !=
+      textView.allowsEditingTextAttributes) {
+    textView.allowsEditingTextAttributes =
+        newViewProps.allowsEditingTextAttributes;
+  }
+
   // default value - must be set before placeholder to make sure it correctly
   // shows on first mount
   if (newViewProps.defaultValue != oldViewProps.defaultValue) {

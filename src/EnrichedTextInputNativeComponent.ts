@@ -130,6 +130,7 @@ export interface NativeProps extends ViewProps {
   // base props
   autoFocus?: boolean;
   editable?: boolean;
+  allowsEditingTextAttributes?: boolean;
   defaultValue?: string;
   placeholder?: string;
   placeholderTextColor?: ColorValue;
