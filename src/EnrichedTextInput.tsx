@@ -31,6 +31,7 @@ import type {
   TextStyle,
   ViewProps,
   ViewStyle,
+  StyleProp,
 } from 'react-native';
 import { normalizeHtmlStyle } from './normalizeHtmlStyle';
 
@@ -131,7 +132,7 @@ export interface EnrichedTextInputProps extends Omit<ViewProps, 'children'> {
   selectionColor?: ColorValue;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   htmlStyle?: HtmlStyle;
-  style?: ViewStyle | TextStyle;
+  style?: StyleProp<ViewStyle | TextStyle>;
   scrollEnabled?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
