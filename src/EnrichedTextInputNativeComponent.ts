@@ -80,6 +80,8 @@ export interface OnRequestAttributedStringResultEvent {
       type: string;
 
       font?: {
+        familyName: string;
+        fontName: string;
         pointSize: Float;
         traits: string[]; // 'bold' | 'italic'
       };
@@ -227,6 +229,7 @@ interface NativeCommands {
   toggleBlockQuote: (viewRef: React.ElementRef<ComponentType>) => void;
   toggleOrderedList: (viewRef: React.ElementRef<ComponentType>) => void;
   toggleUnorderedList: (viewRef: React.ElementRef<ComponentType>) => void;
+  setFont: (viewRef: React.ElementRef<ComponentType>, fontName: string) => void;
   addLink: (
     viewRef: React.ElementRef<ComponentType>,
     start: Int32,
@@ -285,6 +288,7 @@ export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
     'toggleBlockQuote',
     'toggleOrderedList',
     'toggleUnorderedList',
+    'setFont',
     'addLink',
     'addImage',
     'startMention',

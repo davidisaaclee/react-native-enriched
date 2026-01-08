@@ -1084,6 +1084,9 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   } else if ([commandName isEqualToString:@"requestAttributedString"]) {
     NSInteger requestId = [((NSNumber *)args[0]) integerValue];
     [self requestAttributedString:requestId];
+  } else if ([commandName isEqualToString:@"setFont"]) {
+    NSString *fontName = (NSString *)args[0];
+    [self setFont:fontName];
   }
 }
 
@@ -1140,31 +1143,45 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
 
       if ([type isEqualToString:@"font"]) {
         NSDictionary *fontInfo = attr[@"font"];
+        NSString *fontName = fontInfo[@"fontName"];
         NSNumber *pointSize = fontInfo[@"pointSize"];
         NSArray *traits = fontInfo[@"traits"];
 
-        // Build font descriptor with symbolic traits
-        UIFontDescriptorSymbolicTraits symbolicTraits = 0;
-        for (NSString *trait in traits) {
-          if ([trait isEqualToString:@"bold"]) {
-            symbolicTraits |= UIFontDescriptorTraitBold;
-          } else if ([trait isEqualToString:@"italic"]) {
-            symbolicTraits |= UIFontDescriptorTraitItalic;
+        UIFont *font = nullptr;
+
+        // Try to create font using fontName if provided
+        if (fontName != nullptr && fontName.length > 0) {
+          font = [UIFont fontWithName:fontName size:[pointSize doubleValue]];
+        }
+
+        // Fallback: create font with traits if fontName didn't work
+        if (font == nullptr) {
+          // Build font descriptor with symbolic traits
+          UIFontDescriptorSymbolicTraits symbolicTraits = 0;
+          for (NSString *trait in traits) {
+            if ([trait isEqualToString:@"bold"]) {
+              symbolicTraits |= UIFontDescriptorTraitBold;
+            } else if ([trait isEqualToString:@"italic"]) {
+              symbolicTraits |= UIFontDescriptorTraitItalic;
+            }
+          }
+
+          // Create font with the specified size and traits
+          UIFont *baseFont = [UIFont systemFontOfSize:[pointSize doubleValue]];
+          if (symbolicTraits != 0) {
+            UIFontDescriptor *descriptor = [baseFont.fontDescriptor
+                fontDescriptorWithSymbolicTraits:symbolicTraits];
+            if (descriptor != nullptr) {
+              font = [UIFont fontWithDescriptor:descriptor
+                                           size:[pointSize doubleValue]];
+            }
+          } else {
+            font = baseFont;
           }
         }
 
-        // Create font with the specified size and traits
-        UIFont *baseFont = [UIFont systemFontOfSize:[pointSize doubleValue]];
-        if (symbolicTraits != 0) {
-          UIFontDescriptor *descriptor = [baseFont.fontDescriptor
-              fontDescriptorWithSymbolicTraits:symbolicTraits];
-          if (descriptor != nullptr) {
-            UIFont *font = [UIFont fontWithDescriptor:descriptor
-                                                 size:[pointSize doubleValue]];
-            attrs[NSFontAttributeName] = font;
-          }
-        } else {
-          attrs[NSFontAttributeName] = baseFont;
+        if (font != nullptr) {
+          attrs[NSFontAttributeName] = font;
         }
       } else if ([type isEqualToString:@"underlineStyle"]) {
         NSNumber *underlineStyle = attr[@"underlineStyle"];
@@ -1184,6 +1201,57 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   // Update state and notify of changes
   recentlyChangedRange = NSMakeRange(0, textView.textStorage.string.length);
   textView.selectedRange = NSRange(textView.textStorage.string.length, 0);
+  [self anyTextMayHaveBeenModified];
+}
+
+- (void)setFont:(NSString *)fontName {
+  NSRange range = textView.selectedRange;
+
+  if (range.length >= 1) {
+    // Apply font to selection range
+    [textView.textStorage beginEditing];
+    [textView.textStorage
+        enumerateAttribute:NSFontAttributeName
+                   inRange:range
+                   options:0
+                usingBlock:^(id _Nullable value, NSRange fontRange,
+                             BOOL *_Nonnull stop) {
+                  UIFont *currentFont = (UIFont *)value;
+                  if (currentFont != nullptr) {
+                    // Create new font with same size but different name
+                    CGFloat fontSize = currentFont.pointSize;
+                    UIFont *newFont = [UIFont fontWithName:fontName
+                                                      size:fontSize];
+
+                    // Fallback to current font if fontName is invalid
+                    if (newFont == nullptr) {
+                      newFont = currentFont;
+                    }
+
+                    [textView.textStorage addAttribute:NSFontAttributeName
+                                                 value:newFont
+                                                 range:fontRange];
+                  }
+                }];
+    [textView.textStorage endEditing];
+  } else {
+    // Apply font to typing attributes
+    UIFont *currentFont =
+        (UIFont *)textView.typingAttributes[NSFontAttributeName];
+    if (currentFont != nullptr) {
+      CGFloat fontSize = currentFont.pointSize;
+      UIFont *newFont = [UIFont fontWithName:fontName size:fontSize];
+
+      // Fallback to current font if fontName is invalid
+      if (newFont != nullptr) {
+        NSMutableDictionary *newTypingAttrs =
+            [textView.typingAttributes mutableCopy];
+        newTypingAttrs[NSFontAttributeName] = newFont;
+        textView.typingAttributes = newTypingAttrs;
+      }
+    }
+  }
+
   [self anyTextMayHaveBeenModified];
 }
 
@@ -1325,7 +1393,10 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
     auto fontAttr = EnrichedTextInputViewEventEmitter::
         OnRequestAttributedStringResultAttributedStringAttributes{};
     fontAttr.type = "font";
-    fontAttr.font = {.pointSize = font.pointSize, .traits = traits};
+    fontAttr.font = {.familyName = [font.familyName toCppString],
+                     .fontName = [font.fontName toCppString],
+                     .pointSize = font.pointSize,
+                     .traits = traits};
     entry.attributes.push_back(fontAttr);
   }
 

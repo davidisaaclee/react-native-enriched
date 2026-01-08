@@ -45,6 +45,8 @@ export interface AttributedStringRun {
     | {
         type: 'font';
         font: {
+          familyName: string;
+          fontName: string;
           pointSize: number;
           traits: string[];
         };
@@ -113,6 +115,7 @@ export interface EnrichedTextInputInstance extends NativeMethods {
   toggleBlockQuote: () => void;
   toggleOrderedList: () => void;
   toggleUnorderedList: () => void;
+  setFont: (fontName: string) => void;
   setLink: (start: number, end: number, text: string, url: string) => void;
   setImage: (src: string, width: number, height: number) => void;
   startMention: (indicator: string) => void;
@@ -438,6 +441,9 @@ export const EnrichedTextInput = ({
     },
     toggleUnorderedList: () => {
       Commands.toggleUnorderedList(nullthrows(nativeRef.current));
+    },
+    setFont: (fontName: string) => {
+      Commands.setFont(nullthrows(nativeRef.current), fontName);
     },
     setLink: (start: number, end: number, text: string, url: string) => {
       Commands.addLink(nullthrows(nativeRef.current), start, end, text, url);
