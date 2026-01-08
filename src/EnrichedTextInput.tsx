@@ -45,8 +45,7 @@ export interface AttributedStringRun {
     | {
         type: 'font';
         font: {
-          familyName: string;
-          fontName: string;
+          fontName?: string;
           pointSize: number;
           traits: string[];
         };

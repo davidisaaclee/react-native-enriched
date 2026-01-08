@@ -80,8 +80,7 @@ export interface OnRequestAttributedStringResultEvent {
       type: string;
 
       font?: {
-        familyName: string;
-        fontName: string;
+        fontName?: string;
         pointSize: Float;
         traits: string[]; // 'bold' | 'italic'
       };

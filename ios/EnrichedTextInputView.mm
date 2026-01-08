@@ -1393,8 +1393,7 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
     auto fontAttr = EnrichedTextInputViewEventEmitter::
         OnRequestAttributedStringResultAttributedStringAttributes{};
     fontAttr.type = "font";
-    fontAttr.font = {.familyName = [font.familyName toCppString],
-                     .fontName = [font.fontName toCppString],
+    fontAttr.font = {.fontName = [font.fontName toCppString],
                      .pointSize = font.pointSize,
                      .traits = traits};
     entry.attributes.push_back(fontAttr);
